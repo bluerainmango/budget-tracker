@@ -1,20 +1,22 @@
 const FILES_TO_CACHE = [
   "/",
   "/index.html",
-  "/favicon.ico",
   "/manifest.webmanifest",
   "/styles.css",
   "/index.js",
+  "/indexedDB.js",
+  "/service-worker.js",
   "/icons/icon-192x192.png",
   "/icons/icon-512x512.png"
 ];
 
+// Names to store for offline(static, data)
 const CACHE_NAME = "static-cache-v1";
 const DATA_CACHE_NAME = "data-cache-v1";
 
-// install
-self.addEventListener("install", function(evt) {
-  evt.waitUntil(
+// Add cashes when intalling
+self.addEventListener("install", function(e) {
+  e.waitUntil(
     caches.open(CACHE_NAME).then(cache => {
       console.log("Your files were pre-cached successfully!");
       return cache.addAll(FILES_TO_CACHE);
@@ -24,10 +26,12 @@ self.addEventListener("install", function(evt) {
   self.skipWaiting();
 });
 
-// activate
-self.addEventListener("activate", function(evt) {
-  evt.waitUntil(
+// Delete old cache when activating
+self.addEventListener("activate", function(e) {
+  e.waitUntil(
     caches.keys().then(keyList => {
+      console.log("🍓", caches, keyList); // CacheStorage {}, ["static-cache-v1", "data-cache-v1"]
+
       return Promise.all(
         keyList.map(key => {
           if (key !== CACHE_NAME && key !== DATA_CACHE_NAME) {
@@ -42,25 +46,26 @@ self.addEventListener("activate", function(evt) {
   self.clients.claim();
 });
 
-// fetch
-self.addEventListener("fetch", function(evt) {
-  if (evt.request.url.includes("/api/")) {
-    evt.respondWith(
+// Get data and static file from backend server or cache when fetching
+self.addEventListener("fetch", function(e) {
+  // 1. get data
+  if (e.request.url.includes("/api/")) {
+    e.respondWith(
       caches
         .open(DATA_CACHE_NAME)
         .then(cache => {
-          return fetch(evt.request)
+          return fetch(e.request)
             .then(response => {
-              // If the response was good, clone it and store it in the cache.
+              // Network reqeust succeeded, clone the response and store it in the cache.
               if (response.status === 200) {
-                cache.put(evt.request.url, response.clone());
+                cache.put(e.request.url, response.clone());
               }
 
               return response;
             })
             .catch(err => {
               // Network request failed, try to get it from the cache.
-              return cache.match(evt.request);
+              return cache.match(e.request);
             });
         })
         .catch(err => console.log(err))
@@ -69,10 +74,11 @@ self.addEventListener("fetch", function(evt) {
     return;
   }
 
-  evt.respondWith(
+  // 2. Get static files from cache or backend server
+  e.respondWith(
     caches.open(CACHE_NAME).then(cache => {
-      return cache.match(evt.request).then(response => {
-        return response || fetch(evt.request);
+      return cache.match(e.request).then(response => {
+        return response || fetch(e.request);
       });
     })
   );
