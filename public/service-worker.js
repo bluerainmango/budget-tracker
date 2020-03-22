@@ -14,8 +14,10 @@ const FILES_TO_CACHE = [
 const CACHE_NAME = "static-cache-v1";
 const DATA_CACHE_NAME = "data-cache-v1";
 
-// Add cashes when intalling
+// Add static files to cache when intalling
+// Install: init cache and add files for offline
 self.addEventListener("install", function(e) {
+  // service is not installed before the below
   e.waitUntil(
     caches.open(CACHE_NAME).then(cache => {
       console.log("Your files were pre-cached successfully!");
@@ -55,17 +57,48 @@ self.addEventListener("fetch", function(e) {
         .open(DATA_CACHE_NAME)
         .then(cache => {
           return fetch(e.request)
-            .then(response => {
+            .then(async response => {
               // Network reqeust succeeded, clone the response and store it in the cache.
-              if (response.status === 200) {
+              console.log(
+                "✨ network on: what kind request?",
+                e.request,
+                response
+              );
+
+              if (response.status === 200 && e.request.method === "GET") {
                 cache.put(e.request.url, response.clone());
               }
 
+              // if (response.status === 200 && e.request.method === "GET") {
+              //   console.log(
+              //     "🧄 Got a GET request. will save e.request.method",
+              //     e.request.method
+              //   );
+              //   // cache.put(e.request.url, response.clone());
+              //   cache.put(e.request.method, response.clone());
+              // }
+
               return response;
             })
-            .catch(err => {
+            .catch(async err => {
               // Network request failed, try to get it from the cache.
-              return cache.match(e.request);
+              console.log("💥 network off: what kind request?", e.request);
+              console.log("🌝 will get e.request.method", e.request.method);
+
+              if (e.request.method === "GET") {
+                return cache.match(e.request.url);
+              }
+
+              // return cache.match(e.request.method);
+              // if (e.request.method === "GET") {
+              //   return cache.match(e.request.method);
+              // } else if (e.request.method === "POST") {
+              //   // if POST request occurred in offline, save the request to cache
+              //   console.log("🌞🌸Inside post reqiest offline");
+              //   cache.add(e.request.url).then(function() {
+              //     console.log("🌞🌸POST request added");
+              //   });
+              // }
             });
         })
         .catch(err => console.log(err))

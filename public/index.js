@@ -1,21 +1,45 @@
 let transactions = [];
 let myChart;
 
-fetch("/api/transaction")
-  .then(response => {
-    return response.json();
-  })
-  .then(data => {
-    // save db data on global variable
-    transactions = data;
+init();
 
-    populateTotal();
-    populateTable();
-    // populateChart();
-  });
+// async function init() {
+//   const response = await fetch("/api/transaction");
+//   const data = await response.json();
+//   console.log("result: ", response);
+//   console.log("data: ", data);
+//   // save db data on global variable
+//   transactions = data;
+//   const draftTransactions = await loadFromIndexedDB();
+//   console.log("🥑 draft loaded: ", draftTransactions);
+
+//   populateTotal();
+//   populateTable();
+//   populateChart();
+// }
+
+async function init() {
+  fetch("/api/transaction")
+    .then(response => {
+      return response.json();
+    })
+    .then(async data => {
+      // save db data on global variable
+      transactions = data;
+
+      populateTotal();
+      populateTable();
+      populateChart();
+
+      loadFromIndexedDB();
+    });
+}
 
 function populateTotal() {
   // reduce transaction amounts to a single total value
+  console.log("🍉 init transactions arr: ", transactions);
+  if (!transactions) return;
+
   let total = transactions.reduce((total, t) => {
     return total + parseInt(t.value);
   }, 0);
@@ -139,15 +163,15 @@ function sendTransaction(isAdding) {
       console.log("🚨 fetch to server api is failed");
       // saveRecord(transaction);
 
+      //! Save failed POST reqeust to IndexedDB
+      saveToIndexedDB(transaction);
+
       // clear form
       nameEl.value = "";
       amountEl.value = "";
     });
 }
 
-function saveRecord() {
-  return;
-}
 document.querySelector("#add-btn").onclick = function() {
   sendTransaction(true);
 };
@@ -155,3 +179,149 @@ document.querySelector("#add-btn").onclick = function() {
 document.querySelector("#sub-btn").onclick = function() {
   sendTransaction(false);
 };
+
+//! IndexedDB
+function saveToIndexedDB(draftTransaction) {
+  //! Create IndexedDB
+  const request = window.indexedDB.open("budget-trackerDB", 1);
+
+  request.onerror = function(event) {
+    alert("Error occurred! Please allow my web app to use IndexedDB!");
+
+    console.error("🧨 IndexedDB error: " + event.target.errorCode);
+  };
+
+  //! Open a transaction
+  request.onsuccess = () => {
+    const db = request.result;
+
+    // Select stores to use and a transaction type
+    const transaction = db.transaction(["budgetStore"], "readwrite");
+
+    // Select a store to make a transaction
+    const budgetStore = transaction.objectStore("budgetStore");
+
+    // Send a request to add data to the store
+    const addRequest = budgetStore.add({ transaction: draftTransaction });
+
+    addRequest.onsuccess = function(e) {
+      console.log("Successfully data added: ", e.target);
+    };
+
+    // Get data from the store
+    // const getCursorRequest = budgetStore.openCursor();
+
+    // getCursorRequest.onsuccess = e => {
+    //   const cursor = e.target.result;
+
+    //   if (cursor) {
+    //     const budget = cursor.value;
+    //     console.log("found out doc: ", budget);
+    //     // cursor.update(todo);
+
+    //     // 다음 doc으로 이동
+    //     cursor.continue();
+    //   }
+    // };
+
+    // getCursorRequest.onerror = err => {
+    //   console.log("Error occurred curing requesting cursor: ", err);
+    // };
+  };
+}
+
+//! Load draftTransactions from IndexedDB and return its array
+async function loadFromIndexedDB() {
+  console.log("🍑 indexedDB: ", window.indexedDB);
+  const openRequest = await window.indexedDB.open("budget-trackerDB", 1);
+
+  openRequest.onerror = function(e) {
+    alert("Error occurred! Please allow my web app to use IndexedDB!");
+
+    console.error("🧨 IndexedDB error: " + e.target.errorCode);
+  };
+
+  //! Create object store and index for query
+  openRequest.onupgradeneeded = async e => {
+    const db = e.target.result;
+
+    // Use auto increment store
+    await db.createObjectStore("budgetStore", {
+      autoIncrement: "true"
+    });
+
+    console.log("🍇 IndexedDB created");
+    // Create index
+    //   budgetTrackerStore.createIndex("budgetIndex", "transaction");
+  };
+
+  openRequest.onsuccess = async () => {
+    const db = await openRequest.result;
+    console.log("🥝 db", db);
+
+    const transaction = await db.transaction(["budgetStore"], "readwrite");
+    const budgetStore = await transaction.objectStore("budgetStore");
+    const getCursorRequest = await budgetStore.openCursor();
+
+    getCursorRequest.onsuccess = async e => {
+      const cursor = e.target.result;
+      console.log("🍓 cursor: ", cursor);
+
+      // let draftTransactions = [];
+
+      if (!cursor) return;
+
+      // console.log("🥦 found draft transaction: ", draftTransaction);
+
+      // draftTransactions.unshift(draftTransaction);
+      // console.log("🥥🌽 draftTransactions:", draftTransactions);
+      // Send a POST request to server
+
+      const draftTransaction = cursor.value.transaction;
+
+      fetch("/api/transaction", {
+        method: "POST",
+        body: JSON.stringify(draftTransaction),
+        headers: {
+          Accept: "application/json, text/plain, */*",
+          "Content-Type": "application/json"
+        }
+      })
+        .then(response => {
+          return response.json();
+        })
+        .then(data => {
+          // save db data on global variable
+          transactions.unshift(data);
+
+          populateTotal();
+          populateTable();
+          populateChart();
+        });
+
+      await cursor.continue();
+
+      // Clear data of store
+      const clearRequest = budgetStore.clear();
+      clearRequest.onsuccess = e => {
+        console.log("🌊 successfully clear storage");
+      };
+      // if (cursor) {
+      //   const draftTransaction = cursor.value;
+      //   console.log("🥦 found draft transaction: ", draftTransaction);
+
+      //   draftTransactions.unshift(draftTransaction);
+
+      //   cursor.continue();
+      // } else return;
+
+      // return draftTransactions;
+      // add draftTransactions to transactions arr re-render
+      // transactions.unshift(draftTransactions);
+    };
+
+    getCursorRequest.onerror = err => {
+      console.log("Error occurred curing requesting cursor: ", err);
+    };
+  };
+}
