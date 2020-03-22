@@ -233,7 +233,7 @@ async function loadIndexedDBAndRerender() {
       //   "🥝 Retrieved all draft transactions from IndexedDB: ",
       //   draftTransactions
       // );
-      console.log("draftTransactions: ", draftTransactions);
+
       if (draftTransactions.length === 0) return;
 
       //! 1. Add draft transactions to DOM
@@ -267,52 +267,17 @@ async function loadIndexedDBAndRerender() {
           //! Offline
           console.log("💔 Offline! Currently cannot send data to server ", err);
         });
-
-      // try {
-      //   await fetch("/api/transaction/bulk", {
-      //     method: "POST",
-      //     body: JSON.stringify(draftTransactionsArr),
-      //     headers: {
-      //       Accept: "application/json, text/plain, */*",
-      //       "Content-Type": "application/json"
-      //     }
-      //   });
-
-      //   getRequest.onsuccess = () => {
-      //     //! Online : delete saved data from IndexedDB
-      //     console.log("data:", data);
-      //     console.log("😇", budgetStore);
-      //     const clearRequest = budgetStore.clear();
-
-      //     console.log("😈", budgetStore, clearRequest);
-      //     clearRequest.onsuccess = function(e) {
-      //       console.log(
-      //         "🌊 Successfully saved draft transactions to server and cleared IndexedDB."
-      //       );
-
-      //       clearRequest.onerror = e => {
-      //         console.log("clear error", e);
-      //       };
-      //     };
-      //   };
-      // } catch (err) {
-      //   //! Offline
-      //   console.log("💔 Offline! Currently cannot send data to server ", err);
-      // }
     };
 
+    //! If online, clear indexedDB
     if (window.navigator.onLine) {
-      console.log("😇", budgetStore);
       const clearRequest = budgetStore.clear();
 
-      console.log("😈", clearRequest);
       clearRequest.onsuccess = function(e) {
-        console.log(
-          "🌊 Successfully saved draft transactions to server and cleared IndexedDB."
-        );
+        console.log("🌊 Successfully cleared IndexedDB.");
 
         clearRequest.onerror = e => {
-          console.log("clear error", e);
+          console.log("Error occurred during clearing IndexedDB", e);
         };
       };
     }
