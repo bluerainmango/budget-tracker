@@ -1,6 +1,6 @@
 # PWA Budget Tracker
 
-Simple budget tracker working online and offline.
+Simple budget tracker that works online and offline.
 
 ### 🖥 Deployed ver.
 
@@ -16,7 +16,7 @@ You can record your withdrawals and deposits with or without a data/internet con
 
 ## 🔑 Feature
 
-- This web app can be saved and work like a native app.
+- This web app can be saved and works like a native app.
 - Network independent. The app works when the network is unreliable or even non-existent.
 
 ## ✨ Demo
